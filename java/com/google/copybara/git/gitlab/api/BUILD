@@ -1,4 +1,4 @@
-# Copyright 2023 Google Inc.
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,19 +16,22 @@ load("@rules_java//java:defs.bzl", "java_library")
 
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 java_library(
-    name = "extractutil",
-    srcs = glob(["*.java"]),
-    javacopts = [
-        "-Xlint:unchecked",
+    name = "gitlab_api",
+    srcs = [
+        "GitLabApi.java",
+        "GitLabApiException.java",
+        "GitLabApiTransport.java",
+        "GitLabApiTransportImpl.java",
     ],
-    runtime_deps = ["//third_party:tukaani_xz"],
     deps = [
+        "//java/com/google/copybara/credentials",
         "//java/com/google/copybara/exception",
-        "//java/com/google/copybara/util",
-        "//third_party:apache_commons_compress",
+        "//java/com/google/copybara/git/gitlab/api/entities",
+        "//java/com/google/copybara/http/auth",
+        "//java/com/google/copybara/json",
+        "//java/com/google/copybara/util/console",
+        "//third_party:google_http_client",
         "//third_party:guava",
         "//third_party:jsr305",
     ],

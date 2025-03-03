@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Google Inc.
+ * Copyright (C) 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.copybara.remotefile.extractutil;
 
-/** Supported archive types. */
-public enum ExtractType {
-  JAR,
-  ZIP,
-  TAR,
-  TAR_GZ,
-  TAR_XZ,
-}
+package com.google.copybara.git.gitlab.api.entities;
+
+/** Represents all possible entities that could be returned by the GitLab API. */
+public interface GitLabApiEntity {}

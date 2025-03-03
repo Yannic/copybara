@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,26 @@
 
 load("//javatests/com/google/copybara:test.bzl", "all_tests")
 
-licenses(["notice"])
-
 all_tests(
     name = "all_tests",
-    tests = glob(["*Test.java"]),
+    env = {"LC_CTYPE": "en_US.UTF-8"},
+    tags = ["local"],
+    tests = [
+        "GitLabApiTest.java",
+        "GitLabApiTransportImplTest.java",
+    ],
     deps = [
-        "//java/com/google/copybara:base",
-        "//java/com/google/copybara/testing",
+        "//java/com/google/copybara/credentials",
+        "//java/com/google/copybara/exception",
+        "//java/com/google/copybara/git/gitlab/api:gitlab_api",
+        "//java/com/google/copybara/git/gitlab/api/entities",
+        "//java/com/google/copybara/http/auth",
+        "//java/com/google/copybara/util/console",
         "//java/com/google/copybara/util/console/testing",
-        "//third_party:apache_commons_compress",
+        "//third_party:google_http_client",
+        "//third_party:google_http_client_test",
+        "//third_party:guava",
+        "//third_party:junit",
         "//third_party:truth",
     ],
 )

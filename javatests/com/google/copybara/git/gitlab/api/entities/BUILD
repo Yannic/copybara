@@ -1,4 +1,4 @@
-# Copyright 2023 Google Inc.
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,24 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_java//java:defs.bzl", "java_library")
+load("//javatests/com/google/copybara:test.bzl", "all_tests")
 
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-java_library(
-    name = "extractutil",
-    srcs = glob(["*.java"]),
-    javacopts = [
-        "-Xlint:unchecked",
+all_tests(
+    name = "all_tests",
+    env = {"LC_CTYPE": "en_US.UTF-8"},
+    tags = ["local"],
+    tests = [
+        "PaginatedPageListTest.java",
     ],
-    runtime_deps = ["//third_party:tukaani_xz"],
     deps = [
-        "//java/com/google/copybara/exception",
-        "//java/com/google/copybara/util",
-        "//third_party:apache_commons_compress",
-        "//third_party:guava",
-        "//third_party:jsr305",
+        "//java/com/google/copybara/git/gitlab/api/entities",
+        "//java/com/google/copybara/json",
+        "//third_party:google_http_client",
+        "//third_party:google_http_client_test",
+        "//third_party:junit",
+        "//third_party:truth",
     ],
 )
