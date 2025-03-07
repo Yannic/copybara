@@ -169,6 +169,8 @@ public class GitRepository {
   public static final String GIT_DESCRIBE_ABBREV = "GIT_DESCRIBE_ABBREV";
   public static final String GIT_TAG_POINTS_AT = "GIT_TAG_POINTS_TO";
   public static final String HTTP_PERMISSION_DENIED = "The requested URL returned error: 403";
+  public static final String FULL_REF_NAMESPACE = "_copybara_full_ref";
+  public static final String COPYBARA_FETCH_NAMESPACE = "refs/copybara_fetch";
 
   /**
    * The location of the {@code .git} directory. The is also the value of the {@code --git-dir}
@@ -402,27 +404,43 @@ public class GitRepository {
       }
     }
 
+    ImmutableList.Builder<String> refspec = ImmutableList.builder();
+    refspec.add(String.format("%s:%s/%s", ref, COPYBARA_FETCH_NAMESPACE, ref));
     if (fetchTags) {
-      fetch(
-          url,
-          /* prune= */ false,
-          /* force= */ true,
-          ImmutableList.of(ref + ":refs/copybara_fetch/" + ref, "refs/tags/*:refs/tags/*"),
-          partialFetch,
-          depth,
-          false);
-      return resolveReferenceWithContext("refs/copybara_fetch/" + ref, /*contextRef=*/ref, url);
-    } else {
-      fetch(
-          url,
-          /* prune= */ false,
-          /* force= */ true,
-          ImmutableList.of(ref + ":refs/copybara_fetch/" + ref),
-          partialFetch,
-          depth,
-          false);
-      return resolveReferenceWithContext("refs/copybara_fetch/" + ref, /*contextRef=*/ref, url);
+      refspec.add("refs/tags/*:refs/tags/*");
     }
+
+    if (!ref.startsWith("refs/")) {
+      // Define a refspec that attempts to obtain the full reference using wildcards, for use in
+      // GitRevision's fullReference() method.
+      ImmutableList.Builder<String> fullRefspec = ImmutableList.builder();
+      fullRefspec
+          .addAll(refspec.build())
+          .add(
+              String.format(
+                  "refs/*/%s:%s/refs/*/%s%s",
+                  ref, COPYBARA_FETCH_NAMESPACE, ref, FULL_REF_NAMESPACE));
+
+      try {
+        // If this fails, the fetch below will resolve using a simpler refspec.
+        fetch(
+            url,
+            /* prune= */ false,
+            /* force= */ true,
+            fullRefspec.build(),
+            partialFetch,
+            depth,
+            false);
+        return resolveReferenceWithContext(
+            String.format("%s/%s", COPYBARA_FETCH_NAMESPACE, ref), /* contextRef= */ ref, url);
+      } catch (RepoException | CannotResolveRevisionException ignore) {
+        // Ignore, the fetch below will attempt using a simpler refspec.
+      }
+    }
+
+    fetch(url, /* prune= */ false, /* force= */ true, refspec.build(), partialFetch, depth, false);
+    return resolveReferenceWithContext(
+        String.format("%s/%s", COPYBARA_FETCH_NAMESPACE, ref), /* contextRef= */ ref, url);
   }
 
   public GitRevision addDescribeVersion(GitRevision rev) throws RepoException {
@@ -1298,21 +1316,44 @@ public class GitRepository {
 
   /**
    * Checks out the given ref in the repo, quietly and throwing away local changes. If checkoutPath
-   * is empty, it will checkout all files. If not, it will only checkout checkoutPaths
+   * is empty, it will checkout all files. If not, it will only checkout checkoutPaths.
+   *
+   * @param ref the ref to checkout
+   * @param checkoutPaths the paths to checkout, relative to the repo's root
+   * @param commandTimeout the command timeout to use for the checkout operation
+   * @return the command output
+   * @throws RepoException if there is an issue checking out the ref from the repo
    */
-  public CommandOutput forceCheckout(String ref, ImmutableSet<String> checkoutPaths)
+  @CanIgnoreReturnValue
+  public CommandOutput forceCheckout(
+      String ref, ImmutableSet<String> checkoutPaths, Duration commandTimeout)
       throws RepoException {
     ImmutableList.Builder<String> argv = ImmutableList.builder();
     argv.add("checkout", "-q", "-f", checkNotNull(ref));
     argv.addAll(checkoutPaths.stream().filter(e -> !e.isEmpty()).collect(Collectors.toList()));
-    return simpleCommand(argv.build());
+    return simpleCommand(commandTimeout, argv.build());
+  }
+
+  /** Checks out the given ref in the repo, quietly and throwing away local changes. */
+  public CommandOutput forceCheckout(String ref) throws RepoException {
+    return forceCheckout(ref, null);
   }
 
   /**
-   * Set the sparse checkout
+   * Checks out the given ref in the repo, quietly and throwing away local changes.
+   *
+   * @param ref the ref to check out
+   * @return the command output
+   * @throws RepoException if there is an issue checking out the given ref
    */
-  public CommandOutput setSparseCheckout(ImmutableSet<String> checkoutPaths)
+  @CanIgnoreReturnValue
+  public CommandOutput forceCheckout(String ref, @Nullable Duration commandTimeout)
       throws RepoException {
+    return simpleCommand(commandTimeout, "checkout", "-q", "-f", checkNotNull(ref));
+  }
+
+  /** Set the sparse checkout */
+  public CommandOutput setSparseCheckout(ImmutableSet<String> checkoutPaths) throws RepoException {
     ImmutableList.Builder<String> argv = ImmutableList.builder();
     argv.add("sparse-checkout", "set");
     argv.addAll(
@@ -1321,13 +1362,6 @@ public class GitRepository {
             .collect(Collectors.toList()));
     argv.add("--cone");
     return simpleCommand(argv.build());
-  }
-
-  /**
-   * Checks out the given ref in the repo, quietly and throwing away local changes.
-   */
-  public CommandOutput forceCheckout(String ref) throws RepoException {
-    return simpleCommand("checkout", "-q", "-f", checkNotNull(ref));
   }
 
   // DateTimeFormatter.ISO_OFFSET_DATE_TIME might include subseconds, but Git's ISO8601 format does
@@ -1945,7 +1979,7 @@ public class GitRepository {
             Path target = readSymlink(rev.getSha1(), file.getPath());
             symlinks.put(path, target);
           } else {
-            Files.writeString(path, readFile(rev.getSha1(), file.getPath()));
+            Files.write(path, readFileBytes(rev.getSha1(), file.getPath()));
           }
         } catch (IOException e) {
           throw new RepoException(String

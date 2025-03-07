@@ -813,7 +813,9 @@ public class GitRepositoryTest {
         false,
         Optional.empty(),
         false);
-    local.withWorkTree(localWorkdir).forceCheckout(defaultBranch, ImmutableSet.of("a"));
+    local
+        .withWorkTree(localWorkdir)
+        .forceCheckout(defaultBranch, ImmutableSet.of("a"), DEFAULT_TIMEOUT);
 
     assertThat(Files.exists(localWorkdir.resolve("a/foo.txt"))).isTrue();
     assertThat(Files.exists(localWorkdir.resolve("b/bar.txt"))).isFalse();
@@ -902,10 +904,16 @@ public class GitRepositoryTest {
 
     // This is the important part of the test: We do two fetches, the first ones for the default
     // head and if it fails we do one for the ref
-    assertThat(requestedFetches).isEqualTo(ImmutableList.of(
-        ImmutableList.of(),
-        ImmutableList.of("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:refs/copybara_fetch/aaaaaaaaaa"
-            + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
+    assertThat(requestedFetches)
+        .isEqualTo(
+            ImmutableList.of(
+                ImmutableList.of(),
+                ImmutableList.of(
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:refs/copybara_fetch/aaaaaaaaaa"
+                        + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "refs/*/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:refs/copybara_fetch/refs/*/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_copybara_full_ref"),
+                ImmutableList.of(
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:refs/copybara_fetch/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
   }
 
   @Test
@@ -991,6 +999,20 @@ public class GitRepositoryTest {
     Path tempDir = Files.createTempDirectory("testDestination");
     repository.checkout(Glob.ALL_FILES, tempDir, rev);
     assertThat(Files.isSymbolicLink(tempDir.resolve("symlink"))).isTrue();
+  }
+
+  @Test
+  public void testCheckoutBinaryFile() throws Exception {
+    var contents = new byte[]{ (byte) 0, (byte) 1, (byte) 2, (byte) 127, (byte) 128, (byte) 254, (byte) 255};
+    Files.write(workdir.resolve("binary"), contents);
+
+    repository.simpleCommand("add", ".");
+    repository.simpleCommand("commit", "-m", "add binary file");
+    GitRevision rev = repository.getHeadRef();
+
+    Path tempDir = Files.createTempDirectory("testDestination");
+    repository.checkout(Glob.ALL_FILES, tempDir, rev);
+    assertThat(Files.readAllBytes(tempDir.resolve("binary"))).isEqualTo(contents);
   }
 
   @Test
