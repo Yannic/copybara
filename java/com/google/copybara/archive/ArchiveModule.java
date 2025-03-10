@@ -52,42 +52,37 @@ public class ArchiveModule implements StarlarkValue {
       doc = "Extract the contents of the archive to a path.",
       documented = true,
       parameters = {
-          @Param(
-              name = "archive",
-              named = true,
-              doc = "The path to the archive file."
-          ),
-          @Param(
-              name = "type",
-              named = true,
-              doc = "The archive type. Supported types: AUTO, JAR, ZIP, TAR, and TAR_GZ. AUTO will"
-                  + " try to infer the archive type automatically.",
-              defaultValue = "\"AUTO\""
-          ),
-          @Param(
-              name = "destination_folder",
-              named = true,
-              doc = "The path to extract the archive to. This defaults to the directory where the"
-                  + " archive is located.",
-              defaultValue = "None",
-              allowedTypes = {
-                  @ParamType(type = CheckoutPath.class),
-                  @ParamType(type = NoneType.class),
-              }
-          ),
-          @Param(
-              name = "paths",
-              named = true,
-              doc = "An optional glob that is used to filter the files extracted from the "
-                  + "archive.",
-              defaultValue = "None",
-              allowedTypes = {
-                  @ParamType(type = Glob.class),
-                  @ParamType(type = NoneType.class),
-              }
-          )
-      }
-  )
+        @Param(name = "archive", named = true, doc = "The path to the archive file."),
+        @Param(
+            name = "type",
+            named = true,
+            doc =
+                "The archive type. Supported types: AUTO, JAR, ZIP, TAR, TAR_GZ and TAR_XZ. AUTO"
+                    + " will try to infer the archive type automatically.",
+            defaultValue = "\"AUTO\""),
+        @Param(
+            name = "destination_folder",
+            named = true,
+            doc =
+                "The path to extract the archive to. This defaults to the directory where the"
+                    + " archive is located.",
+            defaultValue = "None",
+            allowedTypes = {
+              @ParamType(type = CheckoutPath.class),
+              @ParamType(type = NoneType.class),
+            }),
+        @Param(
+            name = "paths",
+            named = true,
+            doc =
+                "An optional glob that is used to filter the files extracted from the "
+                    + "archive.",
+            defaultValue = "None",
+            allowedTypes = {
+              @ParamType(type = Glob.class),
+              @ParamType(type = NoneType.class),
+            })
+      })
   @SuppressWarnings("unused")
   public void extract(
       CheckoutPath archivePath, String typeStr, Object maybeDestination, Object paths)
@@ -112,9 +107,10 @@ public class ArchiveModule implements StarlarkValue {
       throw Starlark.errorf("There was an error extracting the archive: %s", e.toString());
     }
   }
-  
+
   private static ExtractType resolveArchiveType(CheckoutPath archivePath) throws EvalException {
-    String extension = getFileExtension(archivePath.getPath().getFileName().toString());
+    String filename = archivePath.getPath().getFileName().toString();
+    String extension = getFileExtension(filename);
     switch (extension) {
       case "zip":
         return ExtractType.ZIP;
@@ -123,12 +119,21 @@ public class ArchiveModule implements StarlarkValue {
       case "tar":
         return ExtractType.TAR;
       case "tgz":
-        // fall through
-      case "tar.gz":
         return ExtractType.TAR_GZ;
+      case "gz":
+        if (filename.endsWith(".tar.gz"))  {
+          return ExtractType.TAR_GZ;
+        }
+      // fall through
+      case "xz":
+        if (filename.endsWith(".tar.xz")) {
+          return ExtractType.TAR_XZ;
+        }
+      // fall through
+      default:
+        throw Starlark.errorf(
+            "The archive type couldn't be inferred for the file: %s",
+            archivePath.getPath().toString());
     }
-
-    throw Starlark.errorf("The archive type couldn't be inferred for the file: %s",
-        archivePath.getPath().toString());
   }
 }
